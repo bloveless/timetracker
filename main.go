@@ -15,15 +15,18 @@ type record struct {
 	name string
 }
 
+var editingRecord int
 var records []record
 
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		cx, cy := v.Cursor()
-		if err := v.SetCursor(cx, cy+1); err != nil {
-			ox, oy := v.Origin()
-			if err := v.SetOrigin(ox, oy+1); err != nil {
-				return err
+		if cy+1 < len(records) {
+			if err := v.SetCursor(cx, cy+1); err != nil {
+				ox, oy := v.Origin()
+				if err := v.SetOrigin(ox, oy+1); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -45,20 +48,20 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 
 func newRecord(g *gocui.Gui, v *gocui.View) error {
 	maxX, maxY := g.Size()
-	if v, err := g.SetView("new", maxX/2-30, maxY/2, maxX/2+30, maxY/2+2); err != nil {
+	if v, err := g.SetView("newRecord", maxX/2-30, maxY/2, maxX/2+30, maxY/2+2); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		v.Editable = true
 
-		if _, err := g.SetCurrentView("new"); err != nil {
+		if _, err := g.SetCurrentView("newRecord"); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func saveRecord(g *gocui.Gui, v *gocui.View) error {
+func createRecord(g *gocui.Gui, v *gocui.View) error {
 	var l string
 	var err error
 
@@ -69,7 +72,22 @@ func saveRecord(g *gocui.Gui, v *gocui.View) error {
 
 	records = append(records, record{name: l})
 
-	if err := g.DeleteView("new"); err != nil {
+	g.Update(func(g *gocui.Gui) error {
+		v, err := g.View("main")
+		if err != nil {
+			return err
+		}
+
+		v.Clear()
+
+		for _, r := range records {
+			fmt.Fprintln(v, r.name)
+		}
+
+		return nil
+	})
+
+	if err := g.DeleteView("newRecord"); err != nil {
 		return err
 	}
 
@@ -89,8 +107,10 @@ func editRecord(g *gocui.Gui, v *gocui.View) error {
 		l = ""
 	}
 
+	editingRecord = cy
+
 	maxX, maxY := g.Size()
-	if v, err := g.SetView("edit", maxX/2-30, maxY/2, maxX/2+30, maxY/2+2); err != nil {
+	if v, err := g.SetView("editRecord", maxX/2-30, maxY/2, maxX/2+30, maxY/2+2); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
@@ -98,10 +118,47 @@ func editRecord(g *gocui.Gui, v *gocui.View) error {
 		v.MoveCursor(len(l), 0, true)
 
 		fmt.Fprint(v, l)
-		if _, err := g.SetCurrentView("edit"); err != nil {
+		if _, err := g.SetCurrentView("editRecord"); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func updateRecord(g *gocui.Gui, v *gocui.View) error {
+	var l string
+	var err error
+
+	_, cy := v.Cursor()
+	if l, err = v.Line(cy); err != nil {
+		l = ""
+	}
+
+	records[editingRecord].name = l
+
+	g.Update(func(g *gocui.Gui) error {
+		v, err := g.View("main")
+		if err != nil {
+			return err
+		}
+
+		v.Clear()
+
+		for _, r := range records {
+			fmt.Fprintln(v, r.name)
+		}
+
+		return nil
+	})
+
+	if err := g.DeleteView("editRecord"); err != nil {
+		return err
+	}
+
+	if _, err := g.SetCurrentView("main"); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -116,16 +173,25 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("main", gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
 		return err
 	}
+	if err := g.SetKeybinding("main", 'j', gocui.ModNone, cursorDown); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("main", 'k', gocui.ModNone, cursorUp); err != nil {
+		return err
+	}
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("", 'a', gocui.ModNone, newRecord); err != nil {
+	if err := g.SetKeybinding("main", 'a', gocui.ModNone, newRecord); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("new", gocui.KeyEnter, gocui.ModNone, saveRecord); err != nil {
+	if err := g.SetKeybinding("newRecord", gocui.KeyEnter, gocui.ModNone, createRecord); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("", gocui.KeyEnter, gocui.ModNone, editRecord); err != nil {
+	if err := g.SetKeybinding("main", gocui.KeyEnter, gocui.ModNone, editRecord); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("editRecord", gocui.KeyEnter, gocui.ModNone, updateRecord); err != nil {
 		return err
 	}
 
