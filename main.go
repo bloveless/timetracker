@@ -1,4 +1,3 @@
-// Demo code for the Modal primitive.
 package main
 
 import (
@@ -23,7 +22,7 @@ func main() {
 		recordList.AddItem(record, "", 0, nil)
 	}
 
-	main := tview.NewFlex().
+	mainView := tview.NewFlex().
 		AddItem(recordList, 0, 3, true).
 		AddItem(timeView, 0, 1, false)
 
@@ -55,7 +54,7 @@ func main() {
 
 	grid := tview.NewGrid().
 		SetRows(0, 1).
-		AddItem(main, 0, 0, 1, 1, 0, 0, true).
+		AddItem(mainView, 0, 0, 1, 1, 0, 0, true).
 		AddItem(footer, 1, 0, 1, 1, 0, 0, false)
 
 	pages := tview.NewPages().
